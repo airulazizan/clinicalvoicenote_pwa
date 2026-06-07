@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PWA Check</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#1a56db" />
+  <style>
+    body{font-family:system-ui,Arial,sans-serif;max-width:720px;margin:0 auto;padding:24px;line-height:1.5;background:#f7f8fa;color:#111827}
+    .card{background:white;border:1px solid #dde1e9;border-radius:14px;padding:18px;margin:12px 0;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+    .ok{color:#0d9467;font-weight:700}.bad{color:#d92a2a;font-weight:700}.warn{color:#c97a07;font-weight:700}
+    code{background:#eef0f4;padding:2px 6px;border-radius:6px}
+  </style>
+</head>
+<body>
+  <h1>PWA Check</h1>
+  <div class="card" id="result">Checking...</div>
+  <div class="card">
+    <p><strong>Important:</strong> If the home-screen icon opens with an address bar, it is only a shortcut. Delete that shortcut, clear site data, then install again after this check shows manifest and service worker are OK.</p>
+    <p><a href="./index.html">Back to app</a></p>
+  </div>
+  <script>
+    async function check(){
+      const rows=[];
+      rows.push(['HTTPS', location.protocol === 'https:' || location.hostname === 'localhost']);
+      rows.push(['Standalone display now', matchMedia('(display-mode: standalone)').matches]);
+      try {
+        const m = await fetch('./manifest.webmanifest', {cache:'no-store'});
+        rows.push(['Manifest loads', m.ok]);
+        if (m.ok) {
+          const j = await m.json();
+          rows.push(['display = standalone', j.display === 'standalone']);
+          rows.push(['start_url exists', !!j.start_url]);
+          rows.push(['icons exist', Array.isArray(j.icons) && j.icons.length >= 2]);
+        }
+      } catch(e){ rows.push(['Manifest loads', false]); }
+      if ('serviceWorker' in navigator) {
+        try {
+          const reg = await navigator.serviceWorker.register('./sw.js?v=5', {scope:'./'});
+          await navigator.serviceWorker.ready;
+          rows.push(['Service worker registered', !!reg]);
+          rows.push(['Service worker scope controls this folder', reg.scope.endsWith(location.pathname.replace(/[^/]*$/, ''))]);
+        } catch(e){ rows.push(['Service worker registered', false]); }
+      } else { rows.push(['Service worker supported', false]); }
+      document.getElementById('result').innerHTML = rows.map(([k,v]) => `<p>${v ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>'} ${k}</p>`).join('') + '<p class="warn">If all main items are ✓, open the app page, wait a few seconds, then use Chrome menu → Install app.</p>';
+    }
+    check();
+  </script>
+</body>
+</html>

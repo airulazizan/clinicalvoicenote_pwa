@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ward Round SOAP Dictation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#1a56db" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="bg-grid"></div>
+
+  <div class="shell">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-badge">Clinical AI</div>
+      <h1 class="header-title">Ward Round<br><em>Dictation</em></h1>
+      <p class="header-sub">Speak your clinical notes. Get structured SOAP documentation instantly.</p>
+      <button class="btn btn-outline btn-sm install-btn" id="installAppBtn" style="display:none">Install app</button>
+    </header>
+
+    <!-- Status bar -->
+    <div id="statusBar" class="status-bar status-idle">
+      <span class="status-dot"></span>
+      <span id="statusText">Ready — use Chrome for microphone support</span>
+    </div>
+
+    <!-- API key and model panel -->
+    <section class="card api-card">
+      <div class="api-card-inner">
+        <div>
+          <div class="card-label">Gemini API Key</div>
+          <div class="card-hint">Enter once. Saved in your browser only.</div>
+        </div>
+        <div class="api-key-row">
+          <input type="password" id="apiKeyInput" placeholder="AIza…" autocomplete="off" />
+          <button class="btn btn-save" id="saveKeyBtn">Save</button>
+          <button class="btn btn-outline" id="clearKeyBtn">Clear</button>
+        </div>
+        <div id="apiKeyStatus" class="api-key-note"></div>
+
+        <div class="settings-divider"></div>
+
+        <div class="model-setting">
+          <div>
+            <div class="card-label">Gemini Model</div>
+            <div class="card-hint">Select the model used to generate the SOAP note.</div>
+          </div>
+
+          <div class="model-row">
+            <select id="modelSelect" class="lang-select model-select">
+              <option value="gemini-2.5-flash" selected>Recommended: Gemini 2.5 Flash</option>
+              <option value="gemini-2.5-flash-lite">Fast/low cost: Gemini 2.5 Flash-Lite</option>
+              <option value="gemini-2.5-pro">Higher quality: Gemini 2.5 Pro</option>
+              <option value="gemini-3-flash-preview">Preview: Gemini 3 Flash</option>
+              <option value="gemini-3-pro-preview">Preview: Gemini 3 Pro</option>
+              <option value="custom">Custom model name</option>
+            </select>
+
+            <input
+              type="text"
+              id="customModelInput"
+              class="custom-model-input"
+              placeholder="Example: gemini-2.5-flash"
+              autocomplete="off"
+              style="display:none"
+            />
+          </div>
+
+          <div id="modelStatus" class="model-note">Current model: gemini-2.5-flash</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main two-col layout -->
+    <div class="main-grid">
+
+      <!-- LEFT: Dictation -->
+      <section class="card dictation-card">
+        <div class="card-header">
+          <div class="card-label">Raw Dictation</div>
+          <select id="languageSelect" class="lang-select">
+            <option value="en-US">🇺🇸 English (US)</option>
+            <option value="en-GB">🇬🇧 English (UK)</option>
+            <option value="ms-MY" selected>🇲🇾 Malay (MY)</option>
+          </select>
+        </div>
+
+        <div class="mic-zone" id="micZone">
+          <button class="mic-btn" id="recordBtn" title="Start / Stop recording">
+            <svg id="micIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.93V20H9v2h6v-2h-2v-2.07A7 7 0 0 0 19 11h-2z"/>
+            </svg>
+            <svg id="stopIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+              <rect x="6" y="6" width="12" height="12" rx="2"/>
+            </svg>
+          </button>
+          <div class="mic-label" id="micLabel">Tap to dictate</div>
+          <div class="mic-pulse" id="micPulse"></div>
+        </div>
+
+        <textarea id="rawInput" class="textarea raw-textarea" placeholder="Live dictation appears here. You can also type or paste clinical notes manually."></textarea>
+
+        <div class="card-actions">
+          <button class="btn btn-outline btn-sm btn-danger-outline" id="clearBtn">Clear all</button>
+        </div>
+      </section>
+
+      <!-- RIGHT: SOAP Output -->
+      <section class="card soap-card">
+        <div class="card-header">
+          <div class="card-label">SOAP Note</div>
+          <button class="btn btn-generate" id="processBtn">
+            <span id="processBtnText">Generate</span>
+            <span id="processBtnSpinner" class="spinner" style="display:none"></span>
+          </button>
+        </div>
+
+        <div id="soapSections" class="soap-sections" style="display:none">
+          <div class="soap-block">
+            <div class="soap-heading soap-s">S — Subjective</div>
+            <div class="soap-body" id="soapS"></div>
+          </div>
+          <div class="soap-block">
+            <div class="soap-heading soap-o">O — Objective</div>
+            <div class="soap-body" id="soapO"></div>
+          </div>
+          <div class="soap-block">
+            <div class="soap-heading soap-a">A — Assessment</div>
+            <div class="soap-body" id="soapA"></div>
+          </div>
+          <div class="soap-block">
+            <div class="soap-heading soap-p">P — Plan</div>
+            <div class="soap-body" id="soapP"></div>
+          </div>
+        </div>
+
+        <textarea id="soapFallback" class="textarea soap-textarea" placeholder="Generated SOAP note will appear here." style="display:none"></textarea>
+
+        <div class="soap-placeholder" id="soapPlaceholder">
+          <div class="placeholder-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M9 12h6m-3-3v6M4 6h16M4 10h16M4 14h10M4 18h8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <p>Dictate or type a clinical note,<br>then click <strong>Generate</strong></p>
+        </div>
+
+        <div class="card-actions soap-actions">
+          <button class="btn btn-outline btn-sm" id="copySoapBtn">Copy SOAP</button>
+          <button class="btn btn-outline btn-sm" id="copyRawBtn">Copy Raw</button>
+          <button class="btn btn-outline btn-sm" id="downloadBtn">Download .txt</button>
+        </div>
+
+        <div class="disclaimer">
+          ⚠ AI-generated notes must be reviewed and verified by a clinician before use in patient documentation.
+        </div>
+      </section>
+
+    </div><!-- /main-grid -->
+
+  </div><!-- /shell -->
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js?v=5', { scope: './' }).then(reg => {
+          console.log('Service worker registered:', reg.scope);
+        }).catch(err => {
+          console.warn('Service worker registration failed:', err);
+        });
+      });
+    }
+  </script>
+  <script src="./app.js?v=5"></script>
+</body>
+</html>
